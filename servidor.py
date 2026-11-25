@@ -229,21 +229,36 @@ def ciclo(asins=None, programado=False):
         progreso.update(activo=True, hechos=0, total=len(pares), actual="", inicio=int(time.time()), aviso="")
         if programado:
             cfg_set("ultimo_ciclo", int(time.time()))
-        bloqueos = 0
-        for i, (asin, mercado, titulo) in enumerate(pares):
+        # Ritmo tranquilo (una página cada 6-10 s). Si Amazon limita una lectura, se deja para el final;
+        # si limita varias seguidas, se hace una pausa larga en vez de insistir.
+        cola = [(a, m, t, 0) for a, m, t in pares]
+        bloqueos = pausas = hechos = 0
+        while cola:
+            asin, mercado, titulo, intento = cola.pop(0)
             progreso["actual"] = f"{(titulo or asin)[:40]} · {mercado}"
             estado, d = descargar(asin, mercado)
-            if estado == "bloqueado":  # un reintento tranquilo y, si insiste, se deja para el próximo ciclo
-                time.sleep(random.uniform(20, 35))
-                estado, d = descargar(asin, mercado)
-            guardar_lectura(asin, mercado, estado, d)
-            progreso["hechos"] = i + 1
+            if estado == "bloqueado" and intento == 0:
+                cola.append((asin, mercado, titulo, 1))
+            else:
+                guardar_lectura(asin, mercado, estado, d)
+                hechos += 1
+                progreso["hechos"] = hechos
+                if hechos % 60 == 0:
+                    publicar()  # la web se va actualizando durante la lectura
             bloqueos = bloqueos + 1 if estado == "bloqueado" else 0
             if bloqueos >= 4:
-                progreso["aviso"] = "Amazon está limitando las lecturas; se reintentará en el próximo ciclo."
-                break
-            if i + 1 < len(pares):
-                time.sleep(random.uniform(2.5, 5.0))
+                pausas += 1
+                if pausas > 3:
+                    progreso["aviso"] = "Amazon está limitando las lecturas; el resto se leerá en el próximo ciclo."
+                    break
+                progreso["aviso"] = "Amazon está limitando las lecturas; pausa de 15 minutos."
+                time.sleep(900)
+                bloqueos = 0
+                progreso["aviso"] = ""
+            elif estado == "bloqueado":
+                time.sleep(random.uniform(90, 150))
+            elif cola:
+                time.sleep(random.uniform(6, 10))
         if programado:  # una lectura larga que cruza de franja no debe provocar otra nada más acabar
             cfg_set("ultimo_ciclo", int(time.time()))
         return True
