@@ -1,0 +1,25 @@
+name: Leer BSR
+on:
+  schedule:
+    - cron: "17 */4 * * *"   # cada 4 horas (hora UTC)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: leer
+jobs:
+  leer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leer Amazon
+        run: python3 leer.py
+      - name: Guardar datos
+        run: |
+          git config user.name "bsr-bot"
+          git config user.email "bsr-bot@users.noreply.github.com"
+          git add datos.json
+          git diff --cached --quiet || git commit -m "Lectura BSR $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git pull --rebase --autostash
+          git push
