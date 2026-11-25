@@ -197,7 +197,12 @@ def ciclo(asins=None, programado=False):
     """Lee todos los pares libro×país. Devuelve False si ya había un ciclo en marcha."""
     if not _ciclo_lock.acquire(blocking=False):
         return False
+    despierto = None
     try:
+        try:  # mantiene el Mac despierto mientras dura la lectura (máx. 1 h)
+            despierto = subprocess.Popen(["caffeinate", "-i", "-s", "-t", "3600"])
+        except Exception:
+            pass
         with con() as c:
             libros = c.execute("SELECT asin, titulo, mercados FROM libros WHERE activo=1").fetchall()
         pares = [(l["asin"], m, l["titulo"]) for l in libros if not asins or l["asin"] in asins
@@ -225,6 +230,8 @@ def ciclo(asins=None, programado=False):
     finally:
         progreso.update(activo=False, actual="")
         publicar()
+        if despierto:
+            despierto.terminate()
         _ciclo_lock.release()
 
 
@@ -249,17 +256,25 @@ def publicar():
         print("publicar:", e)
 
 
+def franja(horas=None):
+    """Inicio (ts) de la franja de reloj actual: con 4 h -> 00:00, 04:00, 08:00... hora local."""
+    horas = float(horas or cfg("intervalo_horas", 4))
+    t = time.localtime()
+    medianoche = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+    paso = horas * 3600
+    return int(medianoche + ((time.time() - medianoche) // paso) * paso), int(paso)
+
+
 def programador():
-    time.sleep(5)
+    time.sleep(3)
     while True:
         try:
-            horas = float(cfg("intervalo_horas", 4))
-            ultimo = cfg("ultimo_ciclo", 0)
-            if time.time() - ultimo >= horas * 3600 and not progreso["activo"]:
+            inicio, _ = franja()
+            if cfg("ultimo_ciclo", 0) < inicio and not progreso["activo"]:
                 ciclo(programado=True)
         except Exception as e:  # el programador no debe morir nunca
             print("programador:", e)
-        time.sleep(30)
+        time.sleep(5)  # sondeo corto: tras un despertar programado hay poco margen antes de que el Mac vuelva a dormirse
 
 
 # ---------------------------------------------------------------- API
@@ -301,6 +316,7 @@ def datos(dias):
         "mercados_defecto": cfg("mercados_defecto", MERCADOS_DEFECTO),
         "intervalo_horas": cfg("intervalo_horas", 4),
         "ultimo_ciclo": cfg("ultimo_ciclo", 0),
+        "proximo": sum(franja()),
         "progreso": progreso,
         "lecturas": [[f["asin"], f["mercado"], f["ts"], f["bsr"]] for f in lect],
         "ultimas": [{**dict(f), "categorias": json.loads(f["categorias"] or "[]")} for f in ult],

@@ -156,7 +156,7 @@ function pintarEstado() {
   }
   const tsUlt = Math.max(0, ...D.ultimas.map(u => u.ts));
   if (!tsUlt) { $('#estado').textContent = D.libros.length ? 'Aún sin lecturas.' : ''; return; }
-  const prox = D.ultimo_ciclo + D.intervalo_horas * 3600 - D.ahora;
+  const prox = (D.proximo || D.ultimo_ciclo + D.intervalo_horas * 3600) - D.ahora;
   const proxTxt = prox <= 60 ? 'en breve' : prox < 3600 ? `en ${Math.round(prox / 60)} min` : `en ${hm(prox)}`;
   const bloq = D.ultimas.filter(u => u.estado === 'bloqueado').length;
   $('#estado').textContent = `Última lectura ${hace(D.ahora - tsUlt)} · próxima ${proxTxt}` +
