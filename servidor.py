@@ -4,6 +4,7 @@
 Uso:  python3 servidor.py [--puerto 8770] [--db ruta.sqlite] [--no-abrir] [--sin-programador]
 """
 import argparse
+import contextlib
 import html
 import json
 import random
@@ -64,10 +65,16 @@ progreso = {"activo": False, "hechos": 0, "total": 0, "actual": "", "inicio": 0,
 
 
 # ---------------------------------------------------------------- base de datos
+@contextlib.contextmanager
 def con():
+    """Conexión que confirma los cambios y SIEMPRE se cierra (si no, se agotan los descriptores de archivo)."""
     c = sqlite3.connect(DB_RUTA, timeout=30)
     c.row_factory = sqlite3.Row
-    return c
+    try:
+        with c:
+            yield c
+    finally:
+        c.close()
 
 
 def iniciar_db():
