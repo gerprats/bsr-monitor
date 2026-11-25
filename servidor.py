@@ -217,6 +217,14 @@ def ciclo(asins=None, programado=False):
             libros = c.execute("SELECT asin, titulo, mercados FROM libros WHERE activo=1").fetchall()
         pares = [(l["asin"], m, l["titulo"]) for l in libros if not asins or l["asin"] in asins
                  for m in l["mercados"].split(",") if m in MERCADOS]
+        if not asins:
+            # Donde el libro no tiene ranking (o no existe) basta con mirar una vez al día: ahorra la mitad de las peticiones
+            with con() as c:
+                reciente = {(f["asin"], f["mercado"]) for f in c.execute(
+                    """SELECT l.asin, l.mercado FROM lecturas l
+                       JOIN (SELECT asin, mercado, MAX(id) mid FROM lecturas GROUP BY asin, mercado) u ON l.id = u.mid
+                       WHERE l.estado IN ('sin_ranking', 'no_disponible') AND l.ts > ?""", (int(time.time()) - 20 * 3600,))}
+            pares = [p for p in pares if (p[0], p[1]) not in reciente]
         random.shuffle(pares)
         progreso.update(activo=True, hechos=0, total=len(pares), actual="", inicio=int(time.time()), aviso="")
         if programado:
