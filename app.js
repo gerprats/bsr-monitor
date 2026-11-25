@@ -109,7 +109,7 @@ function librosVisibles() {
   const q = F.buscar.trim().toLowerCase();
   let ls = D.libros.filter(l =>
     (!F.marcas.size || F.marcas.has(l.marca || '—')) &&
-    (!q || tituloDe(l).toLowerCase().includes(q) || l.asin.toLowerCase().includes(q)));
+    (!q || [tituloDe(l), l.asin, l.marca, l.serie].some(x => (x || '').toLowerCase().includes(q))));
   const ms = mercadosVisibles(ls);
   const mejor = l => Math.min(...ms.map(m => ult(l.asin, m.cod)));
   const mejora = l => Math.min(...ms.map(m => delta(l.asin + '|' + m.cod) ?? 0));
@@ -208,7 +208,7 @@ function pintarTabla(ls, ms) {
     h += `<tr class="${l.activo ? '' : 'pausado'}"><td class="libro"><div class="lib">` +
       (l.portada ? `<img src="${esc(l.portada)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="sinp"></div>') +
       `<div class="t"><button data-fila="${l.asin}" title="Ver este libro en todos los países">${esc(tituloDe(l))}</button>
-        <div class="m">${l.marca ? `<span class="marca">${esc(l.marca)}</span>` : ''}${l.asin}${l.activo ? '' : ' · en pausa'}</div></div>
+        <div class="m">${l.marca ? `<span class="marca">${esc(l.marca)}</span>` : ''}${l.asin}${l.serie ? ' · ' + esc(l.serie) : ''}${l.activo ? '' : ' · en pausa'}</div></div>
        <button class="ed" data-editar="${l.asin}" title="Editar" aria-label="Editar">✎</button></div></td>`;
     for (const m of ms) {
       const k = l.asin + '|' + m.cod;

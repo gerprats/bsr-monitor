@@ -38,7 +38,8 @@ MERCADOS = {
     "SE": ("amazon.se", "Suecia", "🇸🇪"),
 }
 DOMINIO_A_MERCADO = {v[0]: k for k, v in MERCADOS.items()}
-MERCADOS_DEFECTO = ["US", "UK", "DE", "FR", "ES", "IT", "NL", "CA", "MX", "BR", "AU", "JP", "IN"]
+# India fuera por defecto: los ASIN de tapa blanda de KDP no existen allí
+MERCADOS_DEFECTO = ["US", "UK", "DE", "FR", "ES", "IT", "NL", "CA", "MX", "BR", "AU", "JP"]
 
 ETIQUETAS_BSR = [
     "Best Sellers Rank",
@@ -83,6 +84,8 @@ def iniciar_db():
         CREATE INDEX IF NOT EXISTS ix_lect_ts ON lecturas(ts);
         CREATE TABLE IF NOT EXISTS config(clave TEXT PRIMARY KEY, valor TEXT);
         """)
+        if "serie" not in [f[1] for f in c.execute("PRAGMA table_info(libros)")]:
+            c.execute("ALTER TABLE libros ADD COLUMN serie TEXT DEFAULT ''")
 
 
 def cfg(clave, defecto=None):
@@ -199,8 +202,8 @@ def ciclo(asins=None, programado=False):
         return False
     despierto = None
     try:
-        try:  # mantiene el Mac despierto mientras dura la lectura (máx. 1 h)
-            despierto = subprocess.Popen(["caffeinate", "-i", "-s", "-t", "3600"])
+        try:  # mantiene el Mac despierto mientras dura la lectura (máx. 3 h)
+            despierto = subprocess.Popen(["caffeinate", "-i", "-s", "-t", "10800"])
         except Exception:
             pass
         with con() as c:
@@ -226,6 +229,8 @@ def ciclo(asins=None, programado=False):
                 break
             if i + 1 < len(pares):
                 time.sleep(random.uniform(2.5, 5.0))
+        if programado:  # una lectura larga que cruza de franja no debe provocar otra nada más acabar
+            cfg_set("ultimo_ciclo", int(time.time()))
         return True
     finally:
         progreso.update(activo=False, actual="")
