@@ -224,7 +224,29 @@ def ciclo(asins=None, programado=False):
         return True
     finally:
         progreso.update(activo=False, actual="")
+        publicar()
         _ciclo_lock.release()
+
+
+def publicar():
+    """Sube los datos al panel web (GitHub Pages) si existe la carpeta github/ enlazada a un repositorio."""
+    carpeta = RAIZ / "github"
+    if DB_RUTA.name != "bsr.sqlite" or not (carpeta / ".git").exists():
+        return
+    try:
+        d = datos(0)
+        d["progreso"] = {"activo": False, "hechos": 0, "total": 0, "actual": "", "aviso": ""}
+        (carpeta / "datos.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        git = ["git", "-C", str(carpeta)]
+        subprocess.run(git + ["add", "datos.json"], capture_output=True, timeout=60)
+        if subprocess.run(git + ["diff", "--cached", "--quiet"], timeout=60).returncode:
+            subprocess.run(git + ["commit", "-q", "-m", time.strftime("Lectura BSR %Y-%m-%d %H:%M")], capture_output=True, timeout=60)
+        subprocess.run(git + ["pull", "-q", "--rebase", "-X", "theirs"], capture_output=True, timeout=120)
+        r = subprocess.run(git + ["push", "-q"], capture_output=True, timeout=120)
+        if r.returncode:
+            print("publicar:", r.stderr.decode(errors="ignore")[-300:])
+    except Exception as e:
+        print("publicar:", e)
 
 
 def programador():

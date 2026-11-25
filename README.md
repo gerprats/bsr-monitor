@@ -1,6 +1,7 @@
 # Monitor BSR
 
-Lee cada 4 horas el Best Sellers Rank de los libros de `libros.json` en cada país y lo muestra en el panel (GitHub Pages).
+Panel del Best Sellers Rank de mis libros por país: https://gerprats.github.io/bsr-monitor/
 
-- **Añadir un libro:** añade una línea en `libros.json` con su ASIN y, si quieres, `"marca"` y `"mercados"` (por defecto, todos).
-- **Forzar una lectura:** pestaña *Actions* → *Leer BSR* → *Run workflow*.
+Las lecturas las hace el monitor del Mac cada 4 horas y publica aquí `datos.json`.
+La lectura programada de GitHub (`leer.py`, *Actions → Leer BSR*) está desactivada porque Amazon bloquea
+las peticiones que salen de los servidores de GitHub.
