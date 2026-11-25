@@ -14,6 +14,7 @@ const F = {
   marcas: new Set(guardado.marcas || []),
   mercados: new Set(guardado.mercados || []),
   buscar: '',
+  pausados: false,       // los libros en pausa (no se leen) quedan ocultos salvo que se pida verlos
   orden: guardado.orden || 'marca',
 };
 let sel = new Map(guardado.sel || []);   // clave -> hueco de color (0..7)
@@ -108,6 +109,7 @@ function alternar(claves) {
 function librosVisibles() {
   const q = F.buscar.trim().toLowerCase();
   let ls = D.libros.filter(l =>
+    (l.activo || F.pausados) &&
     (!F.marcas.size || F.marcas.has(l.marca || '—')) &&
     (!q || [tituloDe(l), l.asin, l.marca, l.serie].some(x => (x || '').toLowerCase().includes(q))));
   const ms = mercadosVisibles(ls);
@@ -124,11 +126,13 @@ function mercadosVisibles(ls) {
 
 function pintarFiltros() {
   $('#f-rango').innerHTML = RANGOS.map(([d, t]) => `<button class="chip ${F.rango === d ? 'on' : ''}" data-rango="${d}">${t}</button>`).join(' ');
-  const marcas = [...new Set(D.libros.map(l => l.marca || '—'))].sort();
-  $('#fila-marcas').style.display = marcas.length > 1 ? '' : 'none';
+  const visibles = D.libros.filter(l => l.activo || F.pausados), nPausa = D.libros.filter(l => !l.activo).length;
+  const marcas = [...new Set(visibles.map(l => l.marca || '—'))].sort();
+  $('#fila-marcas').style.display = marcas.length > 1 || nPausa ? '' : 'none';
   $('#f-marcas').innerHTML = `<button class="chip ${F.marcas.size ? '' : 'on'}" data-marca="">Todas</button>` +
-    marcas.map(m => `<button class="chip ${F.marcas.has(m) ? 'on' : ''}" data-marca="${esc(m)}">${esc(m === '—' ? 'Sin marca' : m)}</button>`).join('');
-  const usados = new Set(D.libros.flatMap(l => l.mercados));
+    marcas.map(m => `<button class="chip ${F.marcas.has(m) ? 'on' : ''}" data-marca="${esc(m)}">${esc(m === '—' ? 'Sin marca' : m)}</button>`).join('') +
+    (nPausa ? `<button class="chip ${F.pausados ? 'on' : ''}" data-pausados="1" title="Libros que no se están leyendo">${F.pausados ? 'Ocultar' : 'Ver'} en pausa (${nPausa})</button>` : '');
+  const usados = new Set(visibles.flatMap(l => l.mercados));
   $('#f-mercados').innerHTML = `<button class="chip ${F.mercados.size ? '' : 'on'}" data-mercado="">Todos</button>` +
     D.mercados.filter(m => usados.has(m.cod)).map(m =>
       `<button class="chip ${F.mercados.has(m.cod) ? 'on' : ''}" data-mercado="${m.cod}" title="${esc(m.nombre)}">${m.bandera} ${m.cod}</button>`).join('');
@@ -351,6 +355,7 @@ document.addEventListener('click', async ev => {
   const d = b.dataset;
   if ('cerrar' in d) return b.closest('dialog').close();
   if ('rango' in d) { F.rango = +d.rango; guardar(); return cargar(); }
+  if ('pausados' in d) { F.pausados = !F.pausados; return pintar(); }
   if ('marca' in d) { if (!d.marca) F.marcas.clear(); else F.marcas.has(d.marca) ? F.marcas.delete(d.marca) : F.marcas.add(d.marca); guardar(); return pintar(); }
   if ('mercado' in d) { if (!d.mercado) F.mercados.clear(); else F.mercados.has(d.mercado) ? F.mercados.delete(d.mercado) : F.mercados.add(d.mercado); guardar(); return pintar(); }
   if ('celda' in d) return alternar([d.celda]);
